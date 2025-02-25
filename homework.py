@@ -212,7 +212,7 @@ def main():
     bot = telebot.TeleBot(TELEGRAM_TOKEN)
     timestamp = int(time.time())
     last_message = ''
-    
+
     while True:
         try:
             response = get_api_answer(timestamp)
