@@ -6,12 +6,11 @@ from http import HTTPStatus
 import requests
 import telebot
 from requests.exceptions import RequestException
-
 from dotenv import load_dotenv
+
 from exceptions import (MissingEnvironmentVariableError,
                         APIRequestError,
-                        APIResponseError
-                        )
+                        APIResponseError)
 
 load_dotenv()
 
@@ -61,23 +60,19 @@ def check_tokens():
         (TELEGRAM_CHAT_ID, 'TELEGRAM_CHAT_ID')
     )
 
-    all_tokens_present = True
     missing_tokens = []
 
     for token, name in tokens:
         if not token:
             logger.critical(
                 f'Отсутствует обязательная переменная окружения: "{name}"')
-            all_tokens_present = False
             missing_tokens.append(name)
 
-    if not all_tokens_present:
+    if missing_tokens:
         raise MissingEnvironmentVariableError(
             f'Отсутствуют обязательные переменные окружения: '
             f'{", ".join(missing_tokens)}'
         )
-
-    return True
 
 
 def send_message(bot, message):
@@ -119,27 +114,31 @@ def get_api_answer(timestamp):
     }
 
     logger.debug(
-        f'Начинаем запрос к API: "{request_params["url"]}". '
-        f'Параметры: {request_params["params"]}, '
-        f'Заголовки: {request_params["headers"]}'
+        'Начинаем запрос к API: "{url}". Параметры: '
+        '{params}, Заголовки: {headers}'.format(**request_params)
     )
 
     try:
         response = requests.get(**request_params)
     except RequestException as error:
         raise ConnectionError(
-            f'Ошибка подключения к API: {error}. '
-            f'URL: {request_params["url"]}, '
-            f'Параметры: {request_params["params"]}'
-            f'Заголовки: {request_params["headers"]}'
+            'Ошибка подключения к API: {error}. '
+            'URL: {url}, Параметры: {params}, Заголовки: {headers}'.format(
+                error=error, **request_params
+            )
         )
 
     if response.status_code != HTTPStatus.OK:
         raise APIRequestError(
-            f'Эндпоинт {request_params["url"]} недоступен. '
-            f'Код ответа: {response.status_code} '
-            f'({HTTPStatus(response.status_code).phrase}),'
-            f'Причина: {response.reason}, Текст ответа: {response.text}'
+            'Эндпоинт {url} недоступен. Код ответа: '
+            '{status_code} ({status_phrase}), Причина: {reason}, '
+            'Текст ответа: {text}'.format(
+                url=request_params['url'],
+                status_code=response.status_code,
+                status_phrase=HTTPStatus(response.status_code).phrase,
+                reason=response.reason,
+                text=response.text
+            )
         )
 
     return response.json()
@@ -225,18 +224,16 @@ def main():
             homework = homeworks[0]
             message = parse_status(homework)
 
-            if message != last_message:
-                if send_message(bot, message):
-                    last_message = message
-
-            timestamp = response.get('current_date', timestamp)
+            if message != last_message and send_message(bot, message):
+                last_message = message
+                timestamp = response.get('current_date', timestamp)
 
         except Exception as error:
             error_message = f'Сбой в работе программы: {error}'
             logger.error(error_message)
-            if error_message != last_message:
-                if send_message(bot, error_message):
-                    last_message = error_message
+            if error_message != last_message and send_message(bot,
+                                                              error_message):
+                last_message = error_message
         finally:
             time.sleep(RETRY_PERIOD)
 
